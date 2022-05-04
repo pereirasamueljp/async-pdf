@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "watch": false,
+    "module": "commonjs",
+    "noImplicitAny": false,
+    "removeComments": true,
+    "noLib": false,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "target": "es6",
+    "sourceMap": true,
+    "allowJs": true,
+    "outDir": "./dist"
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts"
+  ]
+}
