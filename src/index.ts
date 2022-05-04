@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
 import { promises as fs } from 'fs';
-import { PageSizes, PDFDocument, PDFFont, PDFPage, rgb, RotationTypes, StandardFonts } from 'pdf-lib';
+import { PageSizes, PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from 'pdf-lib';
 import { PDFCreateOptions } from './interfaces/createOptions';
 import { PDFLineOptions } from './interfaces/lineOptions';
 import { PDFPageFraming } from './interfaces/pageFraming';
@@ -351,7 +351,7 @@ export class PDF {
             linePosition: unitNormalizerToPT(this.unit, positions.linePosition),
             columnPosition: unitNormalizerToPT(this.unit, positions.columnPosition)
         }
-        normalizedPositions.linePosition = verticalAlignmentFormatter(align, normalizedPositions.linePosition, width);
+        normalizedPositions.linePosition = verticalAlignmentFormatter(align || 'left', normalizedPositions.linePosition, width);
         let textWidthByAlign = align == 'center' ? width / 2 : width;
         this.verifyPositionsByLimit(normalizedPositions, textWidthByAlign, height);
         return normalizedPositions;

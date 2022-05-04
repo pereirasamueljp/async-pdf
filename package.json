@@ -1,8 +1,9 @@
 {
   "name": "async-pdf",
   "version": "0.0.1",
-  "description": "async pdf",
+  "description": "Create, Modify and Merge PDF Files",
   "main": "index.js",
+  "types": "index.d.ts",
   "dependencies": {
     "pdf-lib": "^1.17.1"
   },
@@ -12,7 +13,9 @@
     "typescript": "^4.6.3"
   },
   "scripts": {
-    "start": "tsc && node dist/app.js"
+    "start": "tsc && node dist/app.js",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig-cjs.json && tsc -p tsconfig-es.json && tsc -p tsconfig-es2015.json",
+    "prepublish": "npm run build"
   },
   "author": "samuelpereirajp",
   "license": "MIT",
@@ -20,14 +23,20 @@
     "type": "git",
     "url": "git+https://github.com/pereirasamueljp/async-pdf.git"
   },
+  "files": [
+    "dist",
+    "cjs",
+    "es",
+    "es2015"
+  ],
   "keywords": [
     "async",
     "pdf",
     "async-pdf",
-    "pdf",
     "simple-pdf",
     "simple",
-    "pdf"
+    "merge-pdf",
+    "merge"
   ],
   "bugs": {
     "url": "https://github.com/pereirasamueljp/async-pdf/issues"

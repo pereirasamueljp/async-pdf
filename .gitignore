@@ -3,5 +3,6 @@ build
 dist
 cjs
 es
+es2015
 /tmp/
 package-lock.json
