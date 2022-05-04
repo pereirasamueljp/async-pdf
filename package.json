@@ -17,7 +17,7 @@
     "build": "tsc -p tsconfig.json && tsc -p tsconfig-cjs.json && tsc -p tsconfig-es.json && tsc -p tsconfig-es2015.json",
     "prepublish": "npm run build"
   },
-  "author": "samuelpereirajp",
+  "author": "Samuel Pereira - pereirasamueljp",
   "license": "MIT",
   "repository": {
     "type": "git",
