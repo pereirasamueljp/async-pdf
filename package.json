@@ -2,8 +2,9 @@
   "name": "async-pdf",
   "version": "0.0.2",
   "description": "Create, Modify and Merge PDF Files",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "cjs/index.js",
+  "module": "es/index.js",
+  "types": "cjs/index.d.ts",
   "dependencies": {
     "pdf-lib": "^1.17.1"
   },
@@ -24,7 +25,8 @@
     "url": "git+https://github.com/pereirasamueljp/async-pdf.git"
   },
   "contributors": [
-    "Samuel Pereira (https://github.com/pereirasamueljp)"
+    "Samuel Pereira (https://github.com/pereirasamueljp)",
+    "Breno Oliveira (https://github.com/brenoaos@me.com)"
   ],
   "files": [
     "dist",
