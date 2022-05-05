@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import { PageSizes, PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from 'pdf-lib';
 import { join } from 'path';
 import { PDFFontTypes, PDFPageOrientationTypes, PDFTextAligns, PDFUnitTypes } from '../types';
-import { PDFCreateOptions, PDFLineOptions, PDFPageFraming, PDFPageLimits, PDFPageSpacing, PDFPositions, PDFRGBA, PDFText, PDFTextOptions } from '../interfaces';
+import { PDFArea, PDFCreateOptions, PDFLineOptions, PDFPageFraming, PDFPageLimits, PDFPageSpacing, PDFPositions, PDFRectangleOptions, PDFRGBA, PDFText, PDFTextOptions } from '../interfaces';
 import { PDFGetPageSizeByUnit, PDFUnitNormalizerFromPT, PDFUnitNormalizerToPT, PDFVerticalAlignmentFormatter } from '../utils';
 
 
@@ -170,6 +170,72 @@ export class PDF {
     }
 
     /**
+    * Write a line on the page.
+    * Example:
+    * ```js
+    * // It will write a vertical red line at midle of the page with 50% of opacity
+    * PDF.writeLine({
+    *     start: {
+    *         linePosition: 100,
+    *         columnPosition: 0,
+    *     },
+    *     end: {
+    *         linePosition: 100,
+    *         columnPosition: 297,
+    *     },
+    *     color: { r: 1, g: 0, b: 0, a: 0.5 },
+    *     thickness: 1
+    * })
+    * ```
+    */
+    public writeLine(options: PDFLineOptions) {
+        let startPosition = this.normalizeLine(options.start);
+        let endPosition = this.normalizeLine(options.end)
+        this.page.drawLine({
+            start: { x: startPosition.linePosition, y: startPosition.columnPosition },
+            end: { x: endPosition.linePosition, y: endPosition.columnPosition },
+            thickness: options.thickness,
+            color: this.getColorRGBFromRGBA(options.color),
+        })
+    }
+
+    /**
+    * Write a rectangular on the page.
+    * Example:
+    * ```js
+    * // It will write a rectangular starting at line 10 and column 50 with size of 100 width, 50 height and gray background color
+    *  let options: PDFRectangleOptions = {
+            start: { linePosition: 10, columnPosition: 50 },
+            area: { width: 100, height: 500 },
+            areaColor: { r: 0.95, g: 0.95, b: 0.95, a: 1 },
+        }
+    * PDF.writeRectangle(options)
+    * ```
+    */
+    public writeRectangle(options: PDFRectangleOptions) {
+        let startPosition = this.normalizeLine(options.start);
+        let areaNormalizedWithPositions = this.normalizeLine({ linePosition: options.start.linePosition + options.area.width, columnPosition: options.start.columnPosition + options.area.height });
+        let areaNormalized: PDFArea = {
+            width: areaNormalizedWithPositions.linePosition - PDFUnitNormalizerToPT('mm', options.area.width),
+            height: areaNormalizedWithPositions.columnPosition - PDFUnitNormalizerToPT('mm', options.area.height)
+        }
+        this.page.drawRectangle({
+            x: startPosition.linePosition,
+            y: startPosition.columnPosition,
+            width: areaNormalized.width,
+            height: areaNormalized.height,
+            color: this.getColorRGBFromRGBA(options.areaColor),
+            opacity: this.getAlfaFromRGBA(options.areaColor),
+            borderColor: this.getColorRGBFromRGBA(options.borderColor),
+            borderOpacity: this.getAlfaFromRGBA(options.borderColor),
+            borderWidth: PDFUnitNormalizerToPT(this.unit, options.borderWidth) || undefined,
+            borderLineCap: options.borderLineCap,
+            borderDashArray: options.borderDashArray,
+            borderDashPhase: options.borderDashPhase,
+        })
+    }
+
+    /**
     * Get a text size.
     * Example:
     * @returns Resolve with a text height.
@@ -236,36 +302,6 @@ export class PDF {
     }
 
     /**
-    * Write a line on the page.
-    * Example:
-    * ```js
-    * // It will write a vertical red line at midle of the page with 50% of opacity
-    * PDF.writeLine({
-    *     start: {
-    *         linePosition: 100,
-    *         columnPosition: 0,
-    *     },
-    *     end: {
-    *         linePosition: 100,
-    *         columnPosition: 297,
-    *     },
-    *     color: { r: 1, g: 0, b: 0, a: 0.5 },
-    *     thickness: 1
-    * })
-    * ```
-    */
-    public writeLine(options: PDFLineOptions) {
-        let startPosition = this.normalizeLine(options.start);
-        let endPosition = this.normalizeLine(options.end)
-        this.page.drawLine({
-            start: { x: startPosition.linePosition, y: startPosition.columnPosition },
-            end: { x: endPosition.linePosition, y: endPosition.columnPosition },
-            thickness: options.thickness,
-            color: this.getColorRGBFromRGBA(options.color),
-        })
-    }
-
-    /**
     * Save the document at the file path
     * For example: 
     * ```js
@@ -307,7 +343,7 @@ export class PDF {
     * PDF.getNumberOfPages() // 2
     * ```
     */
-    public async getNumberOfPages() {
+    public getNumberOfPages() {
         return this.pagesControl;
     }
 

@@ -1,0 +1,1 @@
+export type PDFLineCapType = 0 | 1 | 2;
