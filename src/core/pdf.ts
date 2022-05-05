@@ -288,12 +288,12 @@ export class PDF {
     * PDF.getNumberOfPages() // returns 7
     * ```
     */
-    public async loadPDF(pdfFilePath: string){
-        if(!existsSync(pdfFilePath)) this.filePathDoesNotExist(pdfFilePath);
+    public async loadPDF(pdfFilePath: string) {
+        if (!existsSync(pdfFilePath)) this.filePathDoesNotExist(pdfFilePath);
         let document = await fs.readFile(pdfFilePath);
         let pdf = await PDFDocument.load(document);
         let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
-        for(let page of pages ){
+        for (let page of pages) {
             this.document.addPage(page)
         }
     }
@@ -307,9 +307,50 @@ export class PDF {
     * PDF.getNumberOfPages() // 2
     * ```
     */
-    public async getNumberOfPages(){
+    public async getNumberOfPages() {
         return this.pagesControl;
     }
+
+    /**
+    * Get page width.
+    * Example:
+    * @returns - Returns page width.
+    * ```js
+    * let pageOptions = {
+    *    unit: 'mm', 
+    *    orientation: 'portrait', 
+    *    pageSize: { line: 210, column: 297 }, 
+    *    pageSpacing: { top: 10, bottom: 10, left: 10, right: 10 }, 
+    *    font: 'Helvetica-Bold',
+    *}
+    * PDF.addPage(pageOptions)
+    * PDF.getPageWidth() // 210
+    * ```
+    */
+    public getPageWidth() {
+        return PDFUnitNormalizerFromPT(this.unit, this.page.getWidth());
+    }
+
+    /**
+    * Get page height.
+    * Example:
+    * @returns - Returns page height.
+    * ```js
+    *    let pageOptions = {
+    *    unit: 'mm', 
+    *    orientation: 'portrait', 
+    *    pageSize: { line: 210, column: 297 }, 
+    *    pageSpacing: { top: 10, bottom: 10, left: 10, right: 10 }, 
+    *    font: 'Helvetica-Bold',
+    *}
+    * PDF.getPageHeight() // 297
+    * ```
+    */
+    public getPageHeight() {
+        return PDFUnitNormalizerFromPT(this.unit, this.page.getHeight());
+    }
+
+
     private getColorRGBFromRGBA(color?: PDFRGBA) {
         return rgb(color?.r || 0, color?.g || 0, color?.b || 0)
     }
@@ -453,7 +494,7 @@ export class PDF {
     private negativeNumber(attribute: string, value: number) {
         throw Error(`${attribute} can't be set by negative value: ${value}`)
     }
-    private filePathDoesNotExist(filePath: string){
+    private filePathDoesNotExist(filePath: string) {
         throw Error(`File path ${this.file} does not exist`)
     }
 }
