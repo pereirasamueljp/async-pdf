@@ -1,1 +1,1 @@
-export type PageOrientationTypes = 'portrait' | 'landscape' ;
+export type PDFPageOrientationTypes = 'portrait' | 'landscape' ;

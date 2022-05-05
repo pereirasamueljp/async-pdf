@@ -1,4 +1,4 @@
-export const unitNormalizerToPT = (unit?: 'pt' | 'px' | 'in' | 'cm' | 'em' | 'mm' | 'ex' | 'pc', value?: number): number => {
+export const PDFUnitNormalizerToPT = (unit?: 'pt' | 'px' | 'in' | 'cm' | 'em' | 'mm' | 'ex' | 'pc', value?: number): number => {
     if(!value) return 0;
     switch (unit) {
         case 'pt': return value;
@@ -13,7 +13,7 @@ export const unitNormalizerToPT = (unit?: 'pt' | 'px' | 'in' | 'cm' | 'em' | 'mm
     }
 }
 
-export const unitNormalizerFromPT = (unit?: 'pt' | 'px' | 'in' | 'cm' | 'em' | 'mm' | 'ex' | 'pc', value?: number): number => {
+export const PDFUnitNormalizerFromPT = (unit?: 'pt' | 'px' | 'in' | 'cm' | 'em' | 'mm' | 'ex' | 'pc', value?: number): number => {
     if(!value) return 0;
     switch (unit) {
         case 'pt': return value;
