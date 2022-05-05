@@ -9,5 +9,5 @@ export interface PDFCreateOptions {
     orientation: PDFPageOrientationTypes;
     pageSize: PDFPageSize;
     pageSpacing: PDFPageSpacing;
-    font: PDFFontTypes | string;
+    font: PDFFontTypes;
 }
