@@ -13,6 +13,7 @@ export class PDF {
     readonly document: PDFDocument;
     readonly file: string;
     readonly unit: PDFUnitTypes;
+    readonly fontSize: number;
     private pageSize: [number, number];
     private page: PDFPage;
     private pageFraming: PDFPageFraming;
@@ -36,7 +37,8 @@ export class PDF {
     private constructor(document: PDFDocument, font: PDFFont, options?: PDFCreateOptions) {
         this.file = `${join(__dirname, '../tmp')}/${randomBytes(5).toString('hex')}.pdf`;
         this.document = document
-        this.unit = options?.unit || 'pt';
+        this.unit = options?.unit || 'mm';
+        this.fontSize = options?.fontSize || 7.5;
         this.pageSize = PDFGetPageSizeByUnit(options?.unit, options?.pageSize) || PageSizes.A4;
         this.setOrientation(options?.orientation);
         this.page = this.document.addPage(this.pageSize)
@@ -149,13 +151,13 @@ export class PDF {
     * ```
     */
     public writeText(text: string, options: PDFTextOptions) {
-        this.isNegative('size', options.size);
+        this.isNegative('size', options?.size || this.fontSize);
         let font = options.font || this.font
         let pdfText: PDFText = {
             align: options.align,
             positions: options.position,
-            textHeight: this.font.heightAtSize(options.size),
-            textWidth: this.font.widthOfTextAtSize(text, options.size),
+            textHeight: this.font.heightAtSize(options?.size || this.fontSize),
+            textWidth: this.font.widthOfTextAtSize(text, options?.size || this.fontSize),
             value: text
         }
         pdfText = this.normalizeText(pdfText);
@@ -163,9 +165,9 @@ export class PDF {
             x: pdfText.positions.linePosition,
             y: pdfText.positions.columnPosition,
             font: font,
-            size: options.size,
+            size: options.size || this.fontSize,
             color: this.getColorRGBFromRGBA(options?.color),
-            opacity: this.getAlfaFromRGBA(options.color)
+            opacity: this.getAlfaFromRGBA(options?.color)
         })
     }
 
@@ -256,36 +258,41 @@ export class PDF {
     * PDF.getWidthOfTextAtSize('test',20,'Helvetica-Bold')
     * ```
     */
-    public async getWidthOfTextAtSize(text: string, size: number, font: PDFFontTypes | PDFFont) {
-        if (typeof (font) == 'string') {
+    public async getWidthOfTextAtSize(text: string, size: number, font?: PDFFontTypes | PDFFont) {
+        if (typeof font == 'string') {
             return (await this.document.embedFont(font)).widthOfTextAtSize(text, size);
+        } else if (typeof font == 'object') {
+            return font?.widthOfTextAtSize(text, size)
         } else {
-            return font.widthOfTextAtSize(text, size)
+            return this.font.widthOfTextAtSize(text, size)
         }
     }
 
     /**
-    * Get a text size.
+    * Get a [[PDFFont]] by external font.
     * Example:
     * @returns Resolve with a PDFFont.
     * ```js
     * let font = await PDF.getCustomFont("../fonts/HouschkaHead-BoldItalic.otf")
-    * 
-    * PDF.writeText(`Hello world`, {
-    *   font: font,
-    *   align: 'right',
-    *   size: 20,
-    *   position: {
-    *       linePosition: 210,
-    *       columnPosition: 200,
-    *   }
     * }) 
     *```
     */
     public async getCustomFont(fontPath: string) {
         let fontBytes = await fs.readFile(fontPath);
-        let customFont = await this.document.embedFont(fontBytes);
-        return customFont;
+        return this.document.embedFont(fontBytes);;
+    }
+
+    /**
+    * Get a [[PDFFont]] by name.
+    * Example:
+    * @returns Resolve with a PDFFont.
+    * ```js
+    * let font = await PDF.getCustomFont("Helvetica")
+    * }) 
+    *```
+    */
+    public async getFontByName(fontTypes: PDFFontTypes) {
+        return this.document.embedFont(fontTypes);;
     }
 
     /**
@@ -386,6 +393,17 @@ export class PDF {
         return PDFUnitNormalizerFromPT(this.unit, this.page.getHeight());
     }
 
+    /**
+    * Get the document font.
+    * Example:
+    * @returns - Returns a [[PDFFont]].
+    * ```js
+    * PDF.getDocumentFont()
+    * ```
+    */
+    public getDocumentFont() {
+        return this.font
+    }
 
     private getColorRGBFromRGBA(color?: PDFRGBA) {
         return rgb(color?.r || 0, color?.g || 0, color?.b || 0)

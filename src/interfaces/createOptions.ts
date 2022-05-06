@@ -10,4 +10,5 @@ export interface PDFCreateOptions {
     pageSize: PDFPageSize;
     pageSpacing: PDFPageSpacing;
     font: PDFFontTypes;
+    fontSize: number;
 }

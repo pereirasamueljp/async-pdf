@@ -1,4 +1,3 @@
-export { Alignment } from './align';
 export { PDFCreateOptions } from './createOptions';
 export { PDFLineOptions } from './lineOptions';
 export { PDFPageFraming } from './pageFraming';

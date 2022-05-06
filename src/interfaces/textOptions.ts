@@ -6,7 +6,7 @@ import { PDFRGBA } from "./rgb";
 export interface PDFTextOptions {
     position: PDFPositions,
     align: PDFTextAligns,
-    size: number,
+    size?: number,
     color?: PDFRGBA,
     font?: PDFFont,
 }

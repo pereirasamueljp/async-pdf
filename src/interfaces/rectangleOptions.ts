@@ -15,5 +15,5 @@ export interface PDFRectangleOptions {
     borderDashArray?: number[]
     borderDashPhase?: number,
     borderOpacity?: number,
-    borderLineCap: PDFLineCapType,
+    borderLineCap?: PDFLineCapType,
 }
