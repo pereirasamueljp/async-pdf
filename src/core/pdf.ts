@@ -14,6 +14,7 @@ export class PDF {
     readonly file: string;
     readonly unit: PDFUnitTypes;
     readonly fontSize: number;
+    readonly outPath: string;
     private pageSize: [number, number];
     private page: PDFPage;
     private pageFraming: PDFPageFraming;
@@ -27,16 +28,16 @@ export class PDF {
     * Create a new [[PDF]].
     * @returns Resolves with the newly created document.
     */
-    static async create(options?: PDFCreateOptions) {
+    static async create(outPath: string, options?: PDFCreateOptions) {
         const document = await PDFDocument.create();
         const font = await document.embedFont(options?.font || StandardFonts.Helvetica)
-        if (!existsSync(join(__dirname, '../tmp'))) await fs.mkdir(join(__dirname, '../tmp'));
-        return new PDF(document, font, options)
+        return new PDF(document, font, outPath, options)
     }
 
 
-    private constructor(document: PDFDocument, font: PDFFont, options?: PDFCreateOptions) {
-        this.file = `${join(__dirname, '../tmp')}/${randomBytes(5).toString('hex')}.pdf`;
+    private constructor(document: PDFDocument, font: PDFFont, outPath: string, options?: PDFCreateOptions) {
+        this.outPath = outPath;
+        this.file = `${this.outPath}${randomBytes(5).toString('hex')}.pdf`;
         this.document = document
         this.unit = options?.unit || 'mm';
         this.fontSize = options?.fontSize || 7.5;
