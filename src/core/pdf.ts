@@ -29,13 +29,13 @@ export class PDF {
     static async create(options?: PDFCreateOptions) {
         const document = await PDFDocument.create();
         const font = await document.embedFont(options?.font || StandardFonts.Helvetica)
-        if(!existsSync(join(__dirname,'../tmp'))) await fs.mkdir(join(__dirname,'../tmp'))
+        if (!existsSync(join(__dirname, '../tmp'))) await fs.mkdir(join(__dirname, '../tmp'))
         return new PDF(document, font, options)
     }
 
 
     private constructor(document: PDFDocument, font: PDFFont, options?: PDFCreateOptions) {
-        this.file = `${join(__dirname,'../tmp')}/${randomBytes(5).toString('hex')}.pdf`;
+        this.file = `${join(__dirname, '../tmp')}/${randomBytes(5).toString('hex')}.pdf`;
         this.document = document
         this.unit = options?.unit || 'mm';
         this.fontSize = options?.fontSize || 7.5;
@@ -216,11 +216,12 @@ export class PDF {
     */
     public writeRectangle(options: PDFRectangleOptions) {
         let startPosition = this.normalizeLine(options.start);
-        let areaNormalizedWithPositions = this.normalizeLine({ linePosition: options.start.linePosition + options.area.width, columnPosition: options.start.columnPosition + options.area.height });
+        this.normalizeLine({ linePosition: options.start.linePosition + options.area.width, columnPosition: options.start.columnPosition + options.area.height });
         let areaNormalized: PDFArea = {
-            width: areaNormalizedWithPositions.linePosition - PDFUnitNormalizerToPT('mm', options.area.width),
-            height: areaNormalizedWithPositions.columnPosition - PDFUnitNormalizerToPT('mm', options.area.height)
+            width: PDFUnitNormalizerToPT('mm', options.area.width),
+            height: PDFUnitNormalizerToPT('mm', options.area.height)
         }
+        startPosition.columnPosition = startPosition.columnPosition - areaNormalized.height;
         this.page.drawRectangle({
             x: startPosition.linePosition,
             y: startPosition.columnPosition,
@@ -362,7 +363,7 @@ export class PDF {
         if (!pdfFilesPath?.length) this.pdfFilesPathEmpty()
         await this.savePage();
         for (let file of pdfFilesPath) {
-            if(!existsSync(file)) this.filePathDoesNotExist(file)
+            if (!existsSync(file)) this.filePathDoesNotExist(file)
             let document = await fs.readFile(file);
             let pdf = await PDFDocument.load(document);
             let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
