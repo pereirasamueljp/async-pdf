@@ -30,7 +30,7 @@ export class PDF {
     static async create(options?: PDFCreateOptions) {
         const document = await PDFDocument.create();
         const font = await document.embedFont(options?.font || StandardFonts.Helvetica)
-        if (!existsSync(join(__dirname, '../tmp'))) await fs.mkdir(__dirname, '../tmp');
+        if (!existsSync(join(__dirname, '../tmp'))) await fs.mkdir(join(__dirname, '../tmp'));
         return new PDF(document, font, options)
     }
 
