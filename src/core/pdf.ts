@@ -8,13 +8,11 @@ import { PDFArea, PDFCreateOptions, PDFLineOptions, PDFPageFraming, PDFPageLimit
 import { PDFGetPageSizeByUnit, PDFUnitNormalizerFromPT, PDFUnitNormalizerToPT, PDFVerticalAlignmentFormatter } from '../utils';
 
 
-
 export class PDF {
     readonly document: PDFDocument;
     readonly file: string;
     readonly unit: PDFUnitTypes;
     readonly fontSize: number;
-    readonly outPath: string;
     private pageSize: [number, number];
     private page: PDFPage;
     private pageFraming: PDFPageFraming;
@@ -28,16 +26,16 @@ export class PDF {
     * Create a new [[PDF]].
     * @returns Resolves with the newly created document.
     */
-    static async create(outPath: string, options?: PDFCreateOptions) {
+    static async create(options?: PDFCreateOptions) {
         const document = await PDFDocument.create();
         const font = await document.embedFont(options?.font || StandardFonts.Helvetica)
-        return new PDF(document, font, outPath, options)
+        if(!existsSync(join(__dirname,'../tmp'))) await fs.mkdir(join(__dirname,'../tmp'))
+        return new PDF(document, font, options)
     }
 
 
-    private constructor(document: PDFDocument, font: PDFFont, outPath: string, options?: PDFCreateOptions) {
-        this.outPath = outPath;
-        this.file = `${this.outPath}${randomBytes(5).toString('hex')}.pdf`;
+    private constructor(document: PDFDocument, font: PDFFont, options?: PDFCreateOptions) {
+        this.file = `${join(__dirname,'../tmp')}/${randomBytes(5).toString('hex')}.pdf`;
         this.document = document
         this.unit = options?.unit || 'mm';
         this.fontSize = options?.fontSize || 7.5;
@@ -335,11 +333,45 @@ export class PDF {
     */
     public async loadPDF(pdfFilePath: string) {
         if (!existsSync(pdfFilePath)) this.filePathDoesNotExist(pdfFilePath);
+        await this.savePage();
         let document = await fs.readFile(pdfFilePath);
         let pdf = await PDFDocument.load(document);
         let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
         for (let page of pages) {
+            this.document.removePage(0);
             this.document.addPage(page)
+            this.pagesControl++
+            await this.savePage();
+        }
+    }
+
+    /**
+    * Merge multiples pdf file to the document
+    * For example: 
+    * ```js
+    *   // test.pdf has 3 pages and test2.pdf has 2 pages.
+    *   PDF.getNumberOfPages() // returns 1
+    *   PDF.removePage(1);
+    *   PDF.getNumberOfPages() // returns 0;
+    *   let pdfFilesPath = ["/out/pdf/test.pdf","/out/pdf/test2.pdf"]
+    *   PDF.mergePDF(pdfFilesPath)
+    *   PDF.getNumberOfPages() // returns 5
+    * ```
+    */
+    public async mergePDF(pdfFilesPath: string[]) {
+        if (!pdfFilesPath?.length) this.pdfFilesPathEmpty()
+        await this.savePage();
+        for (let file of pdfFilesPath) {
+            if(!existsSync(file)) this.filePathDoesNotExist(file)
+            let document = await fs.readFile(file);
+            let pdf = await PDFDocument.load(document);
+            let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
+            for (let page of pages) {
+                this.document.removePage(0);
+                this.document.addPage(page)
+                this.pagesControl++
+                await this.savePage();
+            }
         }
     }
 
@@ -426,7 +458,7 @@ export class PDF {
             columnPosition: PDFUnitNormalizerToPT(this.unit, positions.columnPosition)
         }
         this.verifyPositionsByLimit(normalizedPositions);
-        positions.columnPosition = this.columnNormalize(positions.columnPosition);
+        normalizedPositions.columnPosition = this.columnNormalize(normalizedPositions.columnPosition);
         return normalizedPositions;
     }
 
@@ -499,7 +531,7 @@ export class PDF {
     }
     private getPageFile(pageNumber: number) {
         let filePage = this.mergeFiles[pageNumber - 1];
-        if (filePage) this.pageDoesNotExist(pageNumber);
+        if (!filePage) this.pageDoesNotExist(pageNumber);
         return filePage;
     }
     private async mergeGroupOfPDF(filePath: string) {
@@ -509,8 +541,8 @@ export class PDF {
             for (let file of this.mergeFiles) {
                 let document = await fs.readFile(file);
                 let pdf = await PDFDocument.load(document);
-                let paginas = await this.document.copyPages(pdf, pdf.getPageIndices());
-                this.document.addPage(paginas[0])
+                let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
+                this.document.addPage(pages[0])
             }
         let pdfPrincipalBytes = await this.document.save()
         await fs.writeFile(filePath, pdfPrincipalBytes, { flag: 'w' });
@@ -530,27 +562,30 @@ export class PDF {
 
     //errors
     private pageDoesNotExist(pageNumber: number) {
-        throw Error(`Page ${pageNumber} does not exist`)
+        throw new Error(`Page ${pageNumber} does not exist`)
     }
     private pagesForMergeDoesNotExist() {
-        throw Error('There is no page to save')
+        throw new Error('There is no page to save')
     }
     private columnIsOutRange(column: number, range: number) {
-        throw Error(`Column ${PDFUnitNormalizerFromPT(this.unit, column)} is out of range. Range: ${PDFUnitNormalizerFromPT(this.unit, range)}`)
+        throw new Error(`Column ${PDFUnitNormalizerFromPT(this.unit, column)} is out of range. Range: ${PDFUnitNormalizerFromPT(this.unit, range)}`)
     }
     private columnWithHeightIsOutRange(column: number, range: number) {
-        throw Error(`Column with height ${PDFUnitNormalizerFromPT(this.unit, column)} is out of range. Range: ${PDFUnitNormalizerFromPT(this.unit, range)}`)
+        throw new Error(`Column with height ${PDFUnitNormalizerFromPT(this.unit, column)} is out of range. Range: ${PDFUnitNormalizerFromPT(this.unit, range)}`)
     }
     private lineIsOutRange(line: number, range: number) {
-        throw Error(`Line ${PDFUnitNormalizerFromPT(this.unit, line)} is out of range. Range: ${PDFUnitNormalizerFromPT(this.unit, range)}`)
+        throw new Error(`Line ${PDFUnitNormalizerFromPT(this.unit, line)} is out of range. Range: ${PDFUnitNormalizerFromPT(this.unit, range)}`)
     }
     private lineWithWidthIsOutRange(line: number, range: number) {
-        throw Error(`Line with width ${PDFUnitNormalizerFromPT(this.unit, line)} is out of range. Range: ${PDFUnitNormalizerFromPT(this.unit, range)}`)
+        throw new Error(`Line with width ${PDFUnitNormalizerFromPT(this.unit, line)} is out of range. Range: ${PDFUnitNormalizerFromPT(this.unit, range)}`)
     }
     private negativeNumber(attribute: string, value: number) {
-        throw Error(`${attribute} can't be set by negative value: ${value}`)
+        throw new Error(`${attribute} can't be set by negative value: ${value}`)
     }
     private filePathDoesNotExist(filePath: string) {
-        throw Error(`File path ${this.file} does not exist`)
+        throw new Error(`File path ${this.file} does not exist`)
+    }
+    private pdfFilesPathEmpty() {
+        throw new Error(`Pdf files path is empty`)
     }
 }
