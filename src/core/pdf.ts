@@ -247,8 +247,13 @@ export class PDF {
     * ```
     */
     public async getHeighAtSize(size: number, font: PDFFontTypes | PDFFont) {
-        if (font = 'Helvetica-Bold')
+        if (typeof font == 'string') {
             return (await this.document.embedFont(font)).heightAtSize(size);
+        } else if (typeof font == 'object') {
+            return font?.heightAtSize(size);
+        } else {
+            return this.font.heightAtSize(size);
+        }
     }
 
     /**
@@ -485,7 +490,7 @@ export class PDF {
     }
 
     private columnNormalize(columnPosition: number) {
-        let newPosition = this.limits.startColumn - columnPosition;
+        let newPosition = this.limits.startColumn + this.pageSpacing.top - columnPosition;
         return newPosition
     }
 
@@ -495,16 +500,14 @@ export class PDF {
     }
 
     private verifyColumnByLimit(columnPosition: number, height: number) {
-        if (columnPosition < this.pageFraming.columnStartPosition + this.pageSpacing.top) this.columnIsOutRange(columnPosition, this.pageFraming.columnStartPosition + this.pageSpacing.top)
-        if (this.limits.startColumn - columnPosition + height < this.pageFraming.columnStartPosition + this.pageSpacing.top) this.columnWithHeightIsOutRange(this.limits.startColumn - columnPosition + height, this.pageFraming.columnStartPosition + this.pageSpacing.top);
-        if (columnPosition + height > this.limits.startColumn) this.columnWithHeightIsOutRange(columnPosition + height, this.limits.startColumn);
-        if (this.limits.startColumn - columnPosition + height > this.limits.startColumn) this.columnWithHeightIsOutRange(this.limits.startColumn - (this.limits.startColumn - columnPosition + height), this.limits.startColumn);
-        if (columnPosition < this.limits.endColumn) this.columnIsOutRange(columnPosition, this.limits.endColumn);
+        if (columnPosition < this.pageFraming.columnStartPosition + this.pageSpacing.top) this.columnIsOutRange(columnPosition, this.pageFraming.columnStartPosition + this.pageSpacing.top);
+        if (columnPosition > this.pageFraming.columnEndPosition - this.pageSpacing.bottom) this.columnIsOutRange(columnPosition, this.pageFraming.columnEndPosition - this.pageSpacing.bottom);
+        if (columnPosition - height < this.pageFraming.columnStartPosition + this.pageSpacing.top) this.columnWithHeightIsOutRange(columnPosition - height, this.pageFraming.columnStartPosition + this.pageSpacing.top);
     }
 
     private verifyLineByLimit(linePosition: number, width: number) {
         if (linePosition < this.limits.startLine) this.lineIsOutRange(linePosition, this.limits.startLine);
-        if (linePosition + width < this.limits.startLine) this.lineWithWidthIsOutRange(linePosition + width, this.limits.startLine);
+        if (linePosition > this.limits.endLine) this.lineIsOutRange(linePosition, this.limits.endLine);
         if (linePosition + width > this.limits.endLine) this.lineWithWidthIsOutRange(linePosition + width, this.limits.endLine);
     }
 
