@@ -2,17 +2,18 @@ import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
 import { promises as fs } from 'fs';
 import { PageSizes, PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from 'pdf-lib';
-import { join } from 'path';
+import { join, sep } from 'path';
 import { PDFFontTypes, PDFPageOrientationTypes, PDFTextAligns, PDFUnitTypes } from '../types';
 import { PDFArea, PDFCreateOptions, PDFLineOptions, PDFPageFraming, PDFPageLimits, PDFPageSpacing, PDFPositions, PDFRectangleOptions, PDFRGBA, PDFText, PDFTextOptions } from '../interfaces';
 import { PDFGetPageSizeByUnit, PDFUnitNormalizerFromPT, PDFUnitNormalizerToPT, PDFVerticalAlignmentFormatter } from '../utils';
-
+import { tmpdir } from 'os'
 
 export class PDF {
     readonly document: PDFDocument;
     readonly file: string;
     readonly unit: PDFUnitTypes;
     readonly fontSize: number;
+    readonly tmpDir: string;
     private pageSize: [number, number];
     private page: PDFPage;
     private pageFraming: PDFPageFraming;
@@ -29,13 +30,15 @@ export class PDF {
     static async create(options?: PDFCreateOptions) {
         const document = await PDFDocument.create();
         const font = await document.embedFont(options?.font || StandardFonts.Helvetica)
-        if (!existsSync(join(__dirname, '../tmp'))) await fs.mkdir(join(__dirname, '../tmp'))
-        return new PDF(document, font, options)
+        const tmpDir = tmpdir() + sep + `.async-pdf`;
+        if (!existsSync(join(tmpDir))) await fs.mkdir(join(tmpDir))
+        return new PDF(document, font, tmpDir, options)
     }
 
 
-    private constructor(document: PDFDocument, font: PDFFont, options?: PDFCreateOptions) {
-        this.file = `${join(__dirname, '../tmp')}/${randomBytes(5).toString('hex')}.pdf`;
+    private constructor(document: PDFDocument, font: PDFFont, tmpDir: string, options?: PDFCreateOptions) {
+        this.tmpDir = tmpDir;
+        this.file = `${join(this.tmpDir)}/${randomBytes(5).toString('hex')}.pdf`;
         this.document = document
         this.unit = options?.unit || 'mm';
         this.fontSize = options?.fontSize || 7.5;
@@ -500,6 +503,7 @@ export class PDF {
     }
 
     private verifyColumnByLimit(columnPosition: number, height: number) {
+        fs.mkdtemp
         if (columnPosition < this.pageFraming.columnStartPosition + this.pageSpacing.top) this.columnIsOutRange(columnPosition, this.pageFraming.columnStartPosition + this.pageSpacing.top);
         if (columnPosition > this.pageFraming.columnEndPosition - this.pageSpacing.bottom) this.columnIsOutRange(columnPosition, this.pageFraming.columnEndPosition - this.pageSpacing.bottom);
         if (columnPosition - height < this.pageFraming.columnStartPosition + this.pageSpacing.top) this.columnWithHeightIsOutRange(columnPosition - height, this.pageFraming.columnStartPosition + this.pageSpacing.top);
