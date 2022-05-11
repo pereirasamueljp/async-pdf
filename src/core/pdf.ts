@@ -9,11 +9,11 @@ import { PDFGetPageSizeByUnit, PDFUnitNormalizerFromPT, PDFUnitNormalizerToPT, P
 import { tmpdir } from 'os'
 
 export class PDF {
-    readonly document: PDFDocument;
-    readonly file: string;
-    readonly unit: PDFUnitTypes;
-    readonly fontSize: number;
-    readonly tmpDir: string;
+    private document: PDFDocument;
+    private file: string;
+    private unit: PDFUnitTypes;
+    private fontSize: number;
+    private tmpDir: string;
     private pageSize: [number, number];
     private page: PDFPage;
     private pageFraming: PDFPageFraming;
@@ -22,6 +22,7 @@ export class PDF {
     private mergeFiles: string[] = [];
     private pagesControl: number = 1;
     private limits: PDFPageLimits = { startColumn: 0, startLine: 0, endColumn: 0, endLine: 0 };
+    private pageSelected: number;
 
     /**
     * Create a new [[PDF]].
@@ -45,6 +46,7 @@ export class PDF {
         this.pageSize = PDFGetPageSizeByUnit(options?.unit, options?.pageSize) || PageSizes.A4;
         this.setOrientation(options?.orientation);
         this.page = this.document.addPage(this.pageSize)
+        this.pageSelected = 1;
         this.pageFraming = { lineStartPosition: 0, lineEndPosition: this.page.getWidth(), columnStartPosition: 0, columnEndPosition: this.page.getHeight() }
         this.pageSpacing = this.normalizePageSpacing(options?.pageSpacing);
         this.setPageLimits();
@@ -74,13 +76,17 @@ export class PDF {
     */
     public async selectPage(pageNumber: number) {
         //verificar se precisa de um retorno com New Promise
-        let pageFile = this.getPageFile(pageNumber);
-        this.saveTheLastPage();
-        this.document.removePage(0);
-        let document = await fs.readFile(pageFile)
-        let pdfDocument = await PDFDocument.load(document);
-        let pages = await pdfDocument.copyPages(pdfDocument, [0]);
-        this.page = this.document.addPage(pages[0])
+        if (pageNumber != this.pageSelected) {
+            let pageFile = this.getPageFile(pageNumber);
+            await this.saveTheLastPage();
+            await this.savePage(this.pageSelected)
+            this.document.removePage(0);
+            let document = await fs.readFile(pageFile)
+            let pdfDocument = await PDFDocument.load(document);
+            let pages = await this.document.copyPages(pdfDocument, [0]);
+            this.page = this.document.addPage(pages[0])
+            this.pageSelected = pageNumber;
+        }
     }
 
     /**
@@ -132,6 +138,7 @@ export class PDF {
         this.setOrientation(pageOptions?.orientation);
         this.page = this.document.addPage(PDFGetPageSizeByUnit(pageOptions?.unit, pageOptions?.pageSize) || this.pageSize)
         this.pagesControl++;
+        this.pageSelected++;
         this.pageFraming = { lineStartPosition: 0, lineEndPosition: this.page.getWidth(), columnStartPosition: 0, columnEndPosition: this.page.getHeight() }
         this.pageSpacing = pageOptions?.pageSpacing || this.pageSpacing
         this.page.setFont(font as PDFFont || this.font)
@@ -251,11 +258,11 @@ export class PDF {
     */
     public async getHeighAtSize(size: number, font: PDFFontTypes | PDFFont) {
         if (typeof font == 'string') {
-            return (await this.document.embedFont(font)).heightAtSize(size);
+            return PDFUnitNormalizerFromPT('mm',(await this.document.embedFont(font)).heightAtSize(size));
         } else if (typeof font == 'object') {
-            return font?.heightAtSize(size);
+            return PDFUnitNormalizerFromPT('mm',font?.heightAtSize(size));
         } else {
-            return this.font.heightAtSize(size);
+            return PDFUnitNormalizerFromPT('mm',this.font.heightAtSize(size));
         }
     }
 
@@ -269,11 +276,11 @@ export class PDF {
     */
     public async getWidthOfTextAtSize(text: string, size: number, font?: PDFFontTypes | PDFFont) {
         if (typeof font == 'string') {
-            return (await this.document.embedFont(font)).widthOfTextAtSize(text, size);
+            return PDFUnitNormalizerFromPT('mm',(await this.document.embedFont(font)).widthOfTextAtSize(text, size));
         } else if (typeof font == 'object') {
-            return font?.widthOfTextAtSize(text, size)
+            return PDFUnitNormalizerFromPT('mm',font?.widthOfTextAtSize(text, size))
         } else {
-            return this.font.widthOfTextAtSize(text, size)
+            return PDFUnitNormalizerFromPT('mm',this.font.widthOfTextAtSize(text, size))
         }
     }
 
@@ -523,15 +530,18 @@ export class PDF {
     }
 
     private wasLastPageSaved() {
-        return existsSync(this.mergeFiles[this.mergeFiles.length - 1])
+        return existsSync(this.mergeFiles[this.pagesControl - 1])
     }
     private async saveTheLastPage() {
         if (!this.wasLastPageSaved()) await fs.writeFile(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
 
     }
-    private async savePage() {
-        await fs.writeFile(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
-        this.mergeFiles.push(this.file + `part${this.pagesControl}`)
+    private async savePage(pageNumber?: number) {
+        await fs.writeFile(this.file + `part${pageNumber || this.pagesControl}`, await this.document.save(), { flag: 'w' })
+        if (!this.mergeFiles.filter(file => file == this.file + `part${pageNumber || this.pagesControl}`)[0]) {
+            this.mergeFiles.push(this.file + `part${pageNumber || this.pagesControl}`)
+        }
+
     }
     private async deletePageFile(file: string) {
         await fs.unlink(file)
@@ -544,14 +554,16 @@ export class PDF {
     }
     private async mergeGroupOfPDF(filePath: string) {
         if (!this.mergeFiles[0] && !this.pagesControl) this.pagesForMergeDoesNotExist();
-        if (!this.mergeFiles[0] && this.pagesControl) { await fs.writeFile(filePath, await this.document.save(), { flag: 'w' }); return }
-        if (this.pagesControl)
-            for (let file of this.mergeFiles) {
-                let document = await fs.readFile(file);
-                let pdf = await PDFDocument.load(document);
-                let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
-                this.document.addPage(pages[0])
-            }
+        if (!this.mergeFiles[0] && this.pagesControl) { await fs.writeFile(filePath, await this.document.save(), { flag: 'w' }); return };
+        await this.saveTheLastPage();
+        await fs.writeFile(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
+        this.document.removePage(0)
+        for (let file of this.mergeFiles) {
+            let document = await fs.readFile(file);
+            let pdf = await PDFDocument.load(document);
+            let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
+            this.document.addPage(pages[0])
+        }
         let pdfPrincipalBytes = await this.document.save()
         await fs.writeFile(filePath, pdfPrincipalBytes, { flag: 'w' });
         for (let file of this.mergeFiles) {

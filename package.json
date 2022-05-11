@@ -1,6 +1,6 @@
 {
   "name": "async-pdf",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Create, Modify and Merge PDF Files",
   "main": "cjs/index.js",
   "module": "es/index.js",
