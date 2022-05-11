@@ -1,6 +1,6 @@
 {
   "name": "async-pdf",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Create, Modify and Merge PDF Files",
   "main": "cjs/index.js",
   "module": "es/index.js",
@@ -36,13 +36,16 @@
     "src"
   ],
   "keywords": [
-    "async",
     "pdf",
-    "async-pdf",
-    "simple-pdf",
+    "async",
+    "merge",
     "simple",
+    "async-pdf",
+    "pdf-async",
     "merge-pdf",
-    "merge"
+    "pdf-merge",
+    "simple-pdf",
+    "pdf-simple"
   ],
   "bugs": {
     "url": "https://github.com/pereirasamueljp/async-pdf/issues"
