@@ -14,24 +14,28 @@ export class PDF {
     private unit: PDFUnitTypes;
     private fontSize: number;
     private tmpDir: string;
+    private orientation: PDFPageOrientationTypes;
     private pageSize: [number, number];
     private page: PDFPage;
     private pageFraming: PDFPageFraming;
     private pageSpacing: PDFPageSpacing;
+    private fontName: string;
     private font: PDFFont;
+    private fontColor: PDFRGBA;
     private mergeFiles: string[] = [];
     private pagesControl: number = 1;
     private limits: PDFPageLimits = { startColumn: 0, startLine: 0, endColumn: 0, endLine: 0 };
     private pageSelected: number;
+    private externalFontPath: string = '';
 
     /**
     * Create a new [[PDF]].
     * @returns Resolves with the newly created document.
     */
     static async create(options?: PDFCreateOptions) {
-        const document = await PDFDocument.create();
-        const font = await document.embedFont(options?.font || StandardFonts.Helvetica)
-        const tmpDir = tmpdir() + sep + `.async-pdf`;
+        let document = await PDFDocument.create();
+        let font = await document.embedFont(options?.font || StandardFonts.Helvetica)
+        let tmpDir = tmpdir() + sep + `.async-pdf`;
         if (!existsSync(join(tmpDir))) await fs.mkdir(join(tmpDir))
         return new PDF(document, font, tmpDir, options)
     }
@@ -44,14 +48,21 @@ export class PDF {
         this.unit = options?.unit || 'mm';
         this.fontSize = options?.fontSize || 7.5;
         this.pageSize = PDFGetPageSizeByUnit(options?.unit, options?.pageSize) || PageSizes.A4;
-        this.setOrientation(options?.orientation);
+        this.fontColor = options?.fontColor || { r: 0, g: 0, b: 0, a: 1 }
+        this.orientation = options?.orientation || 'portrait';
+        this.setOrientation(this.orientation);
         this.page = this.document.addPage(this.pageSize)
         this.pageSelected = 1;
         this.pageFraming = { lineStartPosition: 0, lineEndPosition: this.page.getWidth(), columnStartPosition: 0, columnEndPosition: this.page.getHeight() }
         this.pageSpacing = this.normalizePageSpacing(options?.pageSpacing);
         this.setPageLimits();
         this.font = font;
+        this.fontName = options?.font || StandardFonts.Helvetica;
         this.page.setFont(this.font)
+        this.page.setFontSize(options?.fontSize || this.fontSize)
+        this.page.setFontColor(this.getColorRGBFromRGBA(options?.fontColor))
+ 
+
     }
 
     /**
@@ -74,28 +85,38 @@ export class PDF {
     /**
     * Select page.
     */
-    public async selectPage(pageNumber: number) {
-        //verificar se precisa de um retorno com New Promise
-        if (pageNumber != this.pageSelected) {
-            let pageFile = this.getPageFile(pageNumber);
-            await this.saveTheLastPage();
-            await this.savePage(this.pageSelected)
-            this.document.removePage(0);
-            let document = await fs.readFile(pageFile)
-            let pdfDocument = await PDFDocument.load(document);
-            let pages = await this.document.copyPages(pdfDocument, [0]);
-            this.page = this.document.addPage(pages[0])
-            this.pageSelected = pageNumber;
-        }
+    public async selectPage(pageNumber: number): Promise<void> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                if (pageNumber != this.pageSelected) {
+                    let pageFile = this.getPageFile(pageNumber);
+                    await this.saveTheLastPage();
+                    await this.savePage(this.pageSelected)
+                    await this.createDocument();
+                    let document = await fs.readFile(pageFile)
+                    let pdfDocument = await PDFDocument.load(document);
+                    let pages = await this.document.copyPages(pdfDocument, [0]);
+                    this.page = this.document.addPage(pages[0])
+                    this.pageSelected = pageNumber;
+                }
+                resolve()
+            })
+        })
+
     }
 
     /**
     * Clear the page. 
     */
-    public async clearPage() {
-        await this.saveTheLastPage();
-        this.document.removePage(0);
-        this.page = this.document.addPage(this.pageSize);
+    public async clearPage(): Promise<void> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                await this.saveTheLastPage();
+                this.document.removePage(0);
+                this.page = this.document.addPage(this.pageSize);
+                resolve()
+            })
+        })
     }
 
     /**
@@ -107,13 +128,18 @@ export class PDF {
     * PDF.removePage(200) // Remove the 200th page of the document
     * ```
     */
-    public async removePage(pageNumber: number) {
-        let pageFile = this.getPageFile(pageNumber);
-        if (pageFile) {
-            this.deletePageFile(this.mergeFiles[pageNumber - 1])
-            this.document.removePage(pageNumber - 1)
-            this.pagesControl--;
-        };
+    public async removePage(pageNumber: number): Promise<void> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                let pageFile = this.getPageFile(pageNumber);
+                if (pageFile) {
+                    await this.deletePageFile(this.mergeFiles[pageNumber - 1])
+                    this.document.removePage(pageNumber - 1)
+                    this.pagesControl--;
+                };
+                resolve()
+            })
+        })
     }
 
     /**
@@ -131,18 +157,17 @@ export class PDF {
     * PDF.addPage() // The document will have two pages. The second page will have the same first page options
     * ```
     */
-    public async addPage(pageOptions?: PDFCreateOptions) {
-        await this.savePage();
-        let font: any;
-        if (pageOptions?.font) font = await this.document.embedFont(pageOptions?.font)
-        this.setOrientation(pageOptions?.orientation);
-        this.page = this.document.addPage(PDFGetPageSizeByUnit(pageOptions?.unit, pageOptions?.pageSize) || this.pageSize)
-        this.pagesControl++;
-        this.pageSelected++;
-        this.pageFraming = { lineStartPosition: 0, lineEndPosition: this.page.getWidth(), columnStartPosition: 0, columnEndPosition: this.page.getHeight() }
-        this.pageSpacing = pageOptions?.pageSpacing || this.pageSpacing
-        this.page.setFont(font as PDFFont || this.font)
-        this.document.removePage(0);
+    public async addPage(pageOptions?: PDFCreateOptions): Promise<void> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                await this.savePage();
+                await this.createDocument();
+                await this.createPage(pageOptions);
+                this.pagesControl++;
+                this.pageSelected++;
+                resolve()
+            })
+        })
     }
 
     /**
@@ -160,9 +185,11 @@ export class PDF {
     * }) 
     * ```
     */
-    public writeText(text: string, options: PDFTextOptions) {
+    public async writeText(text: string, options: PDFTextOptions) {
         this.isNegative('size', options?.size || this.fontSize);
-        let font = options.font || this.font
+        let font: PDFFont;
+        font = options.font || this.font
+        this.document
         let pdfText: PDFText = {
             align: options.align,
             positions: options.position,
@@ -256,14 +283,18 @@ export class PDF {
     * PDF.getHeighAtSize(20,'Helvetica-Bold')
     * ```
     */
-    public async getHeighAtSize(size: number, font: PDFFontTypes | PDFFont) {
-        if (typeof font == 'string') {
-            return PDFUnitNormalizerFromPT('mm',(await this.document.embedFont(font)).heightAtSize(size));
-        } else if (typeof font == 'object') {
-            return PDFUnitNormalizerFromPT('mm',font?.heightAtSize(size));
-        } else {
-            return PDFUnitNormalizerFromPT('mm',this.font.heightAtSize(size));
-        }
+    public async getHeighAtSize(size: number, font: PDFFontTypes | PDFFont): Promise<number> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                if (typeof font == 'string') {
+                    resolve(PDFUnitNormalizerFromPT('mm', (await this.document.embedFont(font)).heightAtSize(size)));
+                } else if (typeof font == 'object') {
+                    resolve(PDFUnitNormalizerFromPT('mm', font?.heightAtSize(size)));
+                } else {
+                    resolve(PDFUnitNormalizerFromPT('mm', this.font.heightAtSize(size)));
+                }
+            })
+        })
     }
 
     /**
@@ -274,14 +305,22 @@ export class PDF {
     * PDF.getWidthOfTextAtSize('test',20,'Helvetica-Bold')
     * ```
     */
-    public async getWidthOfTextAtSize(text: string, size: number, font?: PDFFontTypes | PDFFont) {
-        if (typeof font == 'string') {
-            return PDFUnitNormalizerFromPT('mm',(await this.document.embedFont(font)).widthOfTextAtSize(text, size));
-        } else if (typeof font == 'object') {
-            return PDFUnitNormalizerFromPT('mm',font?.widthOfTextAtSize(text, size))
-        } else {
-            return PDFUnitNormalizerFromPT('mm',this.font.widthOfTextAtSize(text, size))
-        }
+    public async getWidthOfTextAtSize(text: string, size: number, font?: PDFFontTypes | PDFFont): Promise<number> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                if (typeof font == 'string') {
+                    resolve(PDFUnitNormalizerFromPT('mm', (await this.document.embedFont(font)).widthOfTextAtSize(text, size)));
+                } else if (typeof font == 'object') {
+                    resolve(PDFUnitNormalizerFromPT('mm', font?.widthOfTextAtSize(text, size)))
+                } else {
+                    resolve(PDFUnitNormalizerFromPT('mm', this.font.widthOfTextAtSize(text, size)))
+                }
+            })
+        })
+    }
+
+    public getWidthOfTextAtSizeByPageFont(text: string, size: number) {
+        return PDFUnitNormalizerFromPT('mm', this.font.widthOfTextAtSize(text, size))
     }
 
     /**
@@ -293,7 +332,7 @@ export class PDF {
     * }) 
     *```
     */
-    public async getCustomFont(fontPath: string) {
+    private async getCustomFont(fontPath: string) {
         let fontBytes = await fs.readFile(fontPath);
         return this.document.embedFont(fontBytes);;
     }
@@ -318,10 +357,30 @@ export class PDF {
     *   PDF.setCustomFont("../fonts/HouschkaHead-BoldItalic.otf")
     * ```
     */
-    public async setCustomFont(fontPath: string) {
-        let fontBytes = await fs.readFile(fontPath);
-        this.font = await this.document.embedFont(fontBytes);
-        this.page.setFont(this.font);
+    public async setCustomFont(fontPath: string): Promise<void> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                this.externalFontPath = fontPath;
+                let fontBytes = await fs.readFile(fontPath);
+                this.font = await this.document.embedFont(fontBytes);
+                this.page.setFont(this.font);
+                resolve()
+            })
+        })
+    }
+
+    private async getFont(font?: string): Promise<PDFFont> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                if (font && existsSync(font)) resolve(await this.getCustomFont(String(font)))
+                if (font) resolve(await this.document.embedFont(font));
+                if (this.externalFontPath) {
+                    let fontBytes = await fs.readFile(this.externalFontPath);
+                    resolve(await this.document.embedFont(fontBytes));
+                }
+                resolve(await this.document.embedFont(this.fontName));
+            })
+        })
     }
 
     /**
@@ -331,9 +390,14 @@ export class PDF {
     * PDF.save("/out/pdf/test.pdf")
     * ```
     */
-    public async save(filePath: string) {
-        await this.saveTheLastPage()
-        this.mergeGroupOfPDF(filePath);
+    public async save(filePath: string): Promise<void> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                await this.saveTheLastPage()
+                await this.mergeGroupOfPDF(filePath);
+                resolve()
+            })
+        })
     }
 
     /**
@@ -347,18 +411,23 @@ export class PDF {
     * PDF.getNumberOfPages() // returns 7
     * ```
     */
-    public async loadPDF(pdfFilePath: string) {
-        if (!existsSync(pdfFilePath)) this.filePathDoesNotExist(pdfFilePath);
-        await this.savePage();
-        let document = await fs.readFile(pdfFilePath);
-        let pdf = await PDFDocument.load(document);
-        let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
-        for (let page of pages) {
-            this.document.removePage(0);
-            this.document.addPage(page)
-            this.pagesControl++
-            await this.savePage();
-        }
+    public async loadPDF(pdfFilePath: string): Promise<void> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                if (!existsSync(pdfFilePath)) this.filePathDoesNotExist(pdfFilePath);
+                await this.savePage();
+                await this.createDocument();
+                let document = await fs.readFile(pdfFilePath);
+                let pdf = await PDFDocument.load(document);
+                let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
+                for (let page of pages) {
+                    this.document.addPage(page)
+                    this.pagesControl++
+                    await this.savePage();
+                }
+                resolve()
+            })
+        })
     }
 
     /**
@@ -374,21 +443,26 @@ export class PDF {
     *   PDF.getNumberOfPages() // returns 5
     * ```
     */
-    public async mergePDF(pdfFilesPath: string[]) {
-        if (!pdfFilesPath?.length) this.pdfFilesPathEmpty()
-        await this.savePage();
-        for (let file of pdfFilesPath) {
-            if (!existsSync(file)) this.filePathDoesNotExist(file)
-            let document = await fs.readFile(file);
-            let pdf = await PDFDocument.load(document);
-            let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
-            for (let page of pages) {
-                this.document.removePage(0);
-                this.document.addPage(page)
-                this.pagesControl++
+    public async mergePDF(pdfFilesPath: string[]): Promise<void> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                if (!pdfFilesPath?.length) this.pdfFilesPathEmpty()
                 await this.savePage();
-            }
-        }
+                for (let file of pdfFilesPath) {
+                    if (!existsSync(file)) this.filePathDoesNotExist(file)
+                    await this.createDocument();
+                    let document = await fs.readFile(file);
+                    let pdf = await PDFDocument.load(document);
+                    let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
+                    for (let page of pages) {
+                        this.document.addPage(page)
+                        this.pagesControl++
+                        await this.savePage();
+                    }
+                }
+                resolve()
+            })
+        })
     }
 
     /**
@@ -455,6 +529,28 @@ export class PDF {
         return this.font
     }
 
+
+    private async createDocument() {
+        this.document = await PDFDocument.create();
+    }
+
+    private async createPage(pageOptions?: PDFCreateOptions) {
+        await this.createDocument();
+        this.fontName = pageOptions?.font || this.fontName;
+        this.font = await this.getFont(pageOptions?.font || this.externalFontPath || this.fontName);
+        this.unit = pageOptions?.unit || this.unit;
+        this.fontSize = pageOptions?.fontSize || this.fontSize;
+        this.pageSize = PDFGetPageSizeByUnit(pageOptions?.unit, pageOptions?.pageSize) || PageSizes.A4;
+        this.setOrientation(pageOptions?.orientation || this.orientation);
+        this.page = this.document.addPage(this.pageSize);
+        this.pageFraming = { lineStartPosition: 0, lineEndPosition: this.page.getWidth(), columnStartPosition: 0, columnEndPosition: this.page.getHeight() }
+        this.pageSpacing = this.normalizePageSpacing(pageOptions?.pageSpacing);
+        this.setPageLimits();
+        this.page.setFont(this.font)
+        this.page.setFontSize(pageOptions?.fontSize || this.fontSize)
+        this.page.setFontColor(this.getColorRGBFromRGBA(pageOptions?.fontColor || this.fontColor))
+    }
+
     private getColorRGBFromRGBA(color?: PDFRGBA) {
         return rgb(color?.r || 0, color?.g || 0, color?.b || 0)
     }
@@ -510,7 +606,6 @@ export class PDF {
     }
 
     private verifyColumnByLimit(columnPosition: number, height: number) {
-        fs.mkdtemp
         if (columnPosition < this.pageFraming.columnStartPosition + this.pageSpacing.top) this.columnIsOutRange(columnPosition, this.pageFraming.columnStartPosition + this.pageSpacing.top);
         if (columnPosition > this.pageFraming.columnEndPosition - this.pageSpacing.bottom) this.columnIsOutRange(columnPosition, this.pageFraming.columnEndPosition - this.pageSpacing.bottom);
         if (columnPosition - height < this.pageFraming.columnStartPosition + this.pageSpacing.top) this.columnWithHeightIsOutRange(columnPosition - height, this.pageFraming.columnStartPosition + this.pageSpacing.top);
@@ -532,8 +627,13 @@ export class PDF {
     private wasLastPageSaved() {
         return existsSync(this.mergeFiles[this.pagesControl - 1])
     }
-    private async saveTheLastPage() {
-        if (!this.wasLastPageSaved()) await fs.writeFile(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
+    private async saveTheLastPage(): Promise<void> {
+        return new Promise(resolve => {
+            setTimeout(async () => {
+                if (!this.wasLastPageSaved()) await fs.writeFile(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
+                resolve();
+            })
+        })
 
     }
     private async savePage(pageNumber?: number) {
@@ -557,7 +657,8 @@ export class PDF {
         if (!this.mergeFiles[0] && this.pagesControl) { await fs.writeFile(filePath, await this.document.save(), { flag: 'w' }); return };
         await this.saveTheLastPage();
         await fs.writeFile(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
-        this.document.removePage(0)
+        if (!this.mergeFiles.filter(filePath => filePath == this.file + `part${this.pagesControl}`)[0]) this.mergeFiles.push(this.file + `part${this.pagesControl}`)
+        this.document = await PDFDocument.create()
         for (let file of this.mergeFiles) {
             let document = await fs.readFile(file);
             let pdf = await PDFDocument.load(document);
