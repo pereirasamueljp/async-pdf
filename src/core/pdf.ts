@@ -193,8 +193,8 @@ export class PDF {
         let pdfText: PDFText = {
             align: options.align,
             positions: options.position,
-            textHeight: this.font.heightAtSize(options?.size || this.fontSize),
-            textWidth: this.font.widthOfTextAtSize(text, options?.size || this.fontSize),
+            textHeight: options?.font?.heightAtSize(options?.size || this.fontSize) || this.font.heightAtSize(options?.size || this.fontSize),
+            textWidth: options?.font?.widthOfTextAtSize(text, options?.size || this.fontSize) || this.font.widthOfTextAtSize(text, options?.size || this.fontSize),
             value: text
         }
         pdfText = this.normalizeText(pdfText);
