@@ -1,12 +1,12 @@
 import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
-import { promises as fs } from 'fs';
 import { PageSizes, PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from 'pdf-lib';
 import { join, sep } from 'path';
 import { PDFFontTypes, PDFPageOrientationTypes, PDFTextAligns, PDFUnitTypes } from '../types';
 import { PDFArea, PDFCreateOptions, PDFLineOptions, PDFPageFraming, PDFPageLimits, PDFPageSpacing, PDFPositions, PDFRectangleOptions, PDFRGBA, PDFText, PDFTextOptions } from '../interfaces';
 import { PDFGetPageSizeByUnit, PDFUnitNormalizerFromPT, PDFUnitNormalizerToPT, PDFVerticalAlignmentFormatter } from '../utils';
 import { tmpdir } from 'os'
+import { mkdirPromise, readFilePromise, unlinkPromise, writeFilePromise } from '../utils/fsPromises';
 
 export class PDF {
     private document: PDFDocument;
@@ -36,7 +36,7 @@ export class PDF {
         let document = await PDFDocument.create();
         let font = await document.embedFont(options?.font || StandardFonts.Helvetica)
         let tmpDir = tmpdir() + sep + `.async-pdf`;
-        if (!existsSync(join(tmpDir))) await fs.mkdir(join(tmpDir))
+        if (!existsSync(join(tmpDir))) await mkdirPromise(join(tmpDir))
         return new PDF(document, font, tmpDir, options)
     }
 
@@ -61,7 +61,7 @@ export class PDF {
         this.page.setFont(this.font)
         this.page.setFontSize(options?.fontSize || this.fontSize)
         this.page.setFontColor(this.getColorRGBFromRGBA(options?.fontColor))
- 
+
 
     }
 
@@ -93,7 +93,7 @@ export class PDF {
                     await this.saveTheLastPage();
                     await this.savePage(this.pageSelected)
                     await this.createDocument();
-                    let document = await fs.readFile(pageFile)
+                    let document = await readFilePromise(pageFile)
                     let pdfDocument = await PDFDocument.load(document);
                     let pages = await this.document.copyPages(pdfDocument, [0]);
                     this.page = this.document.addPage(pages[0])
@@ -264,8 +264,8 @@ export class PDF {
             y: startPosition.columnPosition,
             width: areaNormalized.width,
             height: areaNormalized.height,
-            color: this.getColorRGBFromRGBA(options.areaColor),
-            opacity: this.getAlfaFromRGBA(options.areaColor),
+            color: options.areaColor.a == 0 ? undefined : this.getColorRGBFromRGBA(options.areaColor),
+            opacity: options.areaColor.a == 0 ? undefined : this.getAlfaFromRGBA(options.areaColor),
             borderColor: this.getColorRGBFromRGBA(options.borderColor),
             borderOpacity: this.getAlfaFromRGBA(options.borderColor),
             borderWidth: PDFUnitNormalizerToPT(this.unit, options.borderWidth) || undefined,
@@ -333,7 +333,7 @@ export class PDF {
     *```
     */
     private async getCustomFont(fontPath: string) {
-        let fontBytes = await fs.readFile(fontPath);
+        let fontBytes = await readFilePromise(fontPath);
         return this.document.embedFont(fontBytes);;
     }
 
@@ -361,7 +361,7 @@ export class PDF {
         return new Promise(resolve => {
             setTimeout(async () => {
                 this.externalFontPath = fontPath;
-                let fontBytes = await fs.readFile(fontPath);
+                let fontBytes = await readFilePromise(fontPath);
                 this.font = await this.document.embedFont(fontBytes);
                 this.page.setFont(this.font);
                 resolve()
@@ -375,7 +375,7 @@ export class PDF {
                 if (font && existsSync(font)) resolve(await this.getCustomFont(String(font)))
                 if (font) resolve(await this.document.embedFont(font));
                 if (this.externalFontPath) {
-                    let fontBytes = await fs.readFile(this.externalFontPath);
+                    let fontBytes = await readFilePromise(this.externalFontPath);
                     resolve(await this.document.embedFont(fontBytes));
                 }
                 resolve(await this.document.embedFont(this.fontName));
@@ -417,7 +417,7 @@ export class PDF {
                 if (!existsSync(pdfFilePath)) this.filePathDoesNotExist(pdfFilePath);
                 await this.savePage();
                 await this.createDocument();
-                let document = await fs.readFile(pdfFilePath);
+                let document = await readFilePromise(pdfFilePath);
                 let pdf = await PDFDocument.load(document);
                 let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
                 for (let page of pages) {
@@ -451,7 +451,7 @@ export class PDF {
                 for (let file of pdfFilesPath) {
                     if (!existsSync(file)) this.filePathDoesNotExist(file)
                     await this.createDocument();
-                    let document = await fs.readFile(file);
+                    let document = await readFilePromise(file);
                     let pdf = await PDFDocument.load(document);
                     let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
                     for (let page of pages) {
@@ -630,21 +630,21 @@ export class PDF {
     private async saveTheLastPage(): Promise<void> {
         return new Promise(resolve => {
             setTimeout(async () => {
-                if (!this.wasLastPageSaved()) await fs.writeFile(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
+                if (!this.wasLastPageSaved()) await writeFilePromise(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
                 resolve();
             })
         })
 
     }
     private async savePage(pageNumber?: number) {
-        await fs.writeFile(this.file + `part${pageNumber || this.pagesControl}`, await this.document.save(), { flag: 'w' })
+        await writeFilePromise(this.file + `part${pageNumber || this.pagesControl}`, await this.document.save(), { flag: 'w' })
         if (!this.mergeFiles.filter(file => file == this.file + `part${pageNumber || this.pagesControl}`)[0]) {
             this.mergeFiles.push(this.file + `part${pageNumber || this.pagesControl}`)
         }
 
     }
     private async deletePageFile(file: string) {
-        await fs.unlink(file)
+        await unlinkPromise(file)
         this.mergeFiles = this.mergeFiles.filter(mergeFile => mergeFile != file);
     }
     private getPageFile(pageNumber: number) {
@@ -654,21 +654,21 @@ export class PDF {
     }
     private async mergeGroupOfPDF(filePath: string) {
         if (!this.mergeFiles[0] && !this.pagesControl) this.pagesForMergeDoesNotExist();
-        if (!this.mergeFiles[0] && this.pagesControl) { await fs.writeFile(filePath, await this.document.save(), { flag: 'w' }); return };
+        if (!this.mergeFiles[0] && this.pagesControl) { await writeFilePromise(filePath, await this.document.save(), { flag: 'w' }); return };
         await this.saveTheLastPage();
-        await fs.writeFile(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
+        await writeFilePromise(this.file + `part${this.pagesControl}`, await this.document.save(), { flag: 'w' })
         if (!this.mergeFiles.filter(filePath => filePath == this.file + `part${this.pagesControl}`)[0]) this.mergeFiles.push(this.file + `part${this.pagesControl}`)
         this.document = await PDFDocument.create()
         for (let file of this.mergeFiles) {
-            let document = await fs.readFile(file);
+            let document = await readFilePromise(file);
             let pdf = await PDFDocument.load(document);
             let pages = await this.document.copyPages(pdf, pdf.getPageIndices());
             this.document.addPage(pages[0])
         }
         let pdfPrincipalBytes = await this.document.save()
-        await fs.writeFile(filePath, pdfPrincipalBytes, { flag: 'w' });
+        await writeFilePromise(filePath, pdfPrincipalBytes, { flag: 'w' });
         for (let file of this.mergeFiles) {
-            if (existsSync(file)) await fs.unlink(file)
+            if (existsSync(file)) await unlinkPromise(file)
         }
         this.mergeFiles = [];
     }
